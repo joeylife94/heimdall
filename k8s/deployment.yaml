@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: heimdall
+  namespace: default
+  labels:
+    app: heimdall
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: heimdall
+  template:
+    metadata:
+      labels:
+        app: heimdall
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      containers:
+      - name: heimdall
+        image: heimdall:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "prod"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: heimdall-secrets
+              key: database-url
+        - name: DATABASE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: heimdall-secrets
+              key: database-username
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: heimdall-secrets
+              key: database-password
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: heimdall-config
+              key: kafka-bootstrap-servers
+        - name: ELASTICSEARCH_URIS
+          valueFrom:
+            configMapKeyRef:
+              name: heimdall-config
+              key: elasticsearch-uris
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: heimdall-config
+              key: redis-host
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: heimdall-config
+              key: redis-port
+        - name: JAVA_OPTS
+          value: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30

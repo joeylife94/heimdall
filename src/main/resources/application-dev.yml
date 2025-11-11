@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/heimdall_dev
+    username: heimdall_dev
+    password: heimdall_dev
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  
+  kafka:
+    bootstrap-servers: localhost:9092
+
+logging:
+  level:
+    root: INFO
+    com.heimdall: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.kafka: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

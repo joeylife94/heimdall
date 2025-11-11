@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 체크아웃
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: 릴리즈 노트 생성
+      id: release_notes
+      run: |
+        # 이전 태그 찾기
+        PREVIOUS_TAG=$(git describe --abbrev=0 --tags `git rev-list --tags --skip=1 --max-count=1` 2>/dev/null || echo "")
+        
+        # 변경 사항 추출
+        if [ -z "$PREVIOUS_TAG" ]; then
+          CHANGES=$(git log --pretty=format:"- %s (%h)" --no-merges)
+        else
+          CHANGES=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+        fi
+        
+        # 릴리즈 노트 생성
+        cat > release_notes.md <<EOF
+        ## 변경 사항
+        
+        $CHANGES
+        
+        ## Docker 이미지
+        
+        \`\`\`bash
+        docker pull ghcr.io/${{ github.repository }}:${GITHUB_REF#refs/tags/}
+        \`\`\`
+        
+        ## 배포 방법
+        
+        \`\`\`bash
+        kubectl set image deployment/heimdall heimdall=ghcr.io/${{ github.repository }}:${GITHUB_REF#refs/tags/} -n production
+        \`\`\`
+        EOF
+    
+    - name: GitHub Release 생성
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

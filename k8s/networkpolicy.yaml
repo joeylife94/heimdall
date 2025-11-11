@@ -1,0 +1,79 @@
+---
+# NetworkPolicy - 네트워크 보안 정책
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: heimdall-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: heimdall
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Ingress Controller로부터의 트래픽 허용
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  # 같은 네임스페이스 내 Pod 간 통신 허용
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # PostgreSQL 접근 허용
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Kafka 접근 허용
+  - to:
+    - podSelector:
+        matchLabels:
+          app: kafka
+    ports:
+    - protocol: TCP
+      port: 9092
+  # Elasticsearch 접근 허용
+  - to:
+    - podSelector:
+        matchLabels:
+          app: elasticsearch
+    ports:
+    - protocol: TCP
+      port: 9200
+  # Redis 접근 허용
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # DNS 조회 허용
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+  # 외부 API 호출 허용 (필요한 경우)
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443

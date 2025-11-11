@@ -1,0 +1,86 @@
+# Prometheus 설정 파일
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: 'heimdall-cluster'
+    environment: 'production'
+
+# Alertmanager 설정
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# 알림 규칙 로드
+rule_files:
+  - 'alerts/*.yml'
+
+# 스크랩 대상 설정
+scrape_configs:
+  # Heimdall 애플리케이션
+  - job_name: 'heimdall'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - 'heimdall:8080'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+).*'
+        replacement: '${1}'
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'jvm_.*|process_.*|system_.*|http_.*|logs_.*|kafka_.*'
+        action: keep
+
+  # Prometheus 자체 모니터링
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:9090'
+
+  # PostgreSQL 모니터링 (선택사항)
+  - job_name: 'postgresql'
+    static_configs:
+      - targets:
+          - 'postgres-exporter:9187'
+
+  # Kafka 모니터링 (선택사항)
+  - job_name: 'kafka'
+    static_configs:
+      - targets:
+          - 'kafka-exporter:9308'
+
+  # Node Exporter (시스템 메트릭)
+  - job_name: 'node'
+    static_configs:
+      - targets:
+          - 'node-exporter:9100'
+
+# Kubernetes 서비스 디스커버리 (K8s 환경)
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name

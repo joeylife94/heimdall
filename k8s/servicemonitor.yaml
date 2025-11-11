@@ -1,0 +1,19 @@
+---
+# ServiceMonitor for Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: heimdall-metrics
+  namespace: default
+  labels:
+    app: heimdall
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: heimdall
+  endpoints:
+  - port: http
+    path: /actuator/prometheus
+    interval: 30s
+    scrapeTimeout: 10s
