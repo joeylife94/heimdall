@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.heimdall.grpc";
+option java_outer_classname = "LogServiceProto";
+
+package heimdall;
+
+// 로그 수집 gRPC 서비스
+service LogService {
+  // 단일 로그 수집
+  rpc IngestLog(LogIngestionRequest) returns (LogIngestionResponse);
+  
+  // 스트리밍 로그 수집 (고성능)
+  rpc StreamLogs(stream LogIngestionRequest) returns (stream LogIngestionResponse);
+  
+  // 배치 로그 수집
+  rpc BatchIngestLogs(BatchLogIngestionRequest) returns (BatchLogIngestionResponse);
+  
+  // 로그 조회
+  rpc GetLog(GetLogRequest) returns (LogEntry);
+  
+  // 로그 검색
+  rpc SearchLogs(SearchLogsRequest) returns (SearchLogsResponse);
+}
+
+// 로그 수집 요청
+message LogIngestionRequest {
+  string source = 1;
+  string service_name = 2;
+  string environment = 3;
+  string severity = 4;  // TRACE, DEBUG, INFO, WARN, ERROR, FATAL
+  string log_content = 5;
+  int64 timestamp_millis = 6;
+  map<string, string> metadata = 7;
+  string trace_id = 8;  // 분산 추적 ID
+  string span_id = 9;   // Span ID
+}
+
+// 로그 수집 응답
+message LogIngestionResponse {
+  int64 log_id = 1;
+  string event_id = 2;
+  int64 timestamp_millis = 3;
+  string status = 4;  // ACCEPTED, REJECTED, ERROR
+  bool analysis_requested = 5;
+  string error_message = 6;
+}
+
+// 배치 로그 수집 요청
+message BatchLogIngestionRequest {
+  repeated LogIngestionRequest logs = 1;
+}
+
+// 배치 로그 수집 응답
+message BatchLogIngestionResponse {
+  int32 total_count = 1;
+  int32 success_count = 2;
+  int32 failure_count = 3;
+  repeated LogIngestionResponse responses = 4;
+}
+
+// 로그 조회 요청
+message GetLogRequest {
+  oneof identifier {
+    int64 log_id = 1;
+    string event_id = 2;
+  }
+}
+
+// 로그 엔트리
+message LogEntry {
+  int64 log_id = 1;
+  string event_id = 2;
+  int64 timestamp_millis = 3;
+  string source = 4;
+  string service_name = 5;
+  string environment = 6;
+  string severity = 7;
+  string log_content = 8;
+  string log_hash = 9;
+  map<string, string> metadata = 10;
+  bool has_analysis = 11;
+  int64 created_at_millis = 12;
+}
+
+// 로그 검색 요청
+message SearchLogsRequest {
+  string service_name = 1;
+  string environment = 2;
+  string severity = 3;
+  int64 from_timestamp_millis = 4;
+  int64 to_timestamp_millis = 5;
+  string keyword = 6;
+  int32 page = 7;
+  int32 size = 8;
+}
+
+// 로그 검색 응답
+message SearchLogsResponse {
+  repeated LogEntry logs = 1;
+  int32 total_count = 2;
+  int32 page = 3;
+  int32 size = 4;
+  int32 total_pages = 5;
+}

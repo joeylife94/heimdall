@@ -1,0 +1,94 @@
+# NGINX Ingress Controller 설정
+# MSA 환경에서 API Gateway 역할
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bifrost-ecosystem-gateway
+  namespace: production
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # Rate Limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    # Load Balancing
+    nginx.ingress.kubernetes.io/load-balance: "round_robin"
+    # TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.bifrost-ecosystem.com
+    secretName: bifrost-ecosystem-tls
+  rules:
+  # Heimdall API Routes
+  - host: api.bifrost-ecosystem.com
+    http:
+      paths:
+      # 로그 수집 API
+      - path: /heimdall/api/v1/logs(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: heimdall-service
+            port:
+              number: 8080
+      
+      # 검색 API
+      - path: /heimdall/api/v1/search(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: heimdall-service
+            port:
+              number: 8080
+      
+      # 통계 API
+      - path: /heimdall/api/v1/statistics(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: heimdall-service
+            port:
+              number: 8080
+      
+      # Health Check
+      - path: /heimdall/actuator/health(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: heimdall-service
+            port:
+              number: 8080
+      
+      # Bifrost API Routes (미래 확장용)
+      - path: /bifrost/api/v1(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: bifrost-service
+            port:
+              number: 8000
+
+---
+# Rate Limiting ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-rate-limit
+  namespace: production
+data:
+  rate-limit: |
+    limit_req_zone $binary_remote_addr zone=api_limit:10m rate=100r/s;
+    limit_req zone=api_limit burst=200 nodelay;

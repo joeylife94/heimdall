@@ -1,0 +1,79 @@
+spring:
+  # Elasticsearch 설정
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URI:http://localhost:9200}
+    username: ${ELASTICSEARCH_USERNAME:}
+    password: ${ELASTICSEARCH_PASSWORD:}
+    connection-timeout: 10s
+    socket-timeout: 60s
+
+  # Distributed Tracing (Zipkin)
+  zipkin:
+    base-url: ${ZIPKIN_URL:http://localhost:9411}
+    enabled: ${ZIPKIN_ENABLED:false}
+  
+  sleuth:
+    sampler:
+      probability: ${TRACING_SAMPLE_RATE:0.1}
+
+# Resilience4j 설정
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 100
+        minimumNumberOfCalls: 10
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 60s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+    instances:
+      bifrost-service:
+        baseConfig: default
+        waitDurationInOpenState: 120s
+        failureRateThreshold: 60
+  
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 1000
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+    instances:
+      bifrost-service:
+        baseConfig: default
+        maxAttempts: 5
+  
+  bulkhead:
+    configs:
+      default:
+        maxConcurrentCalls: 100
+    instances:
+      bifrost-service:
+        maxConcurrentCalls: 50
+  
+  ratelimiter:
+    configs:
+      default:
+        registerHealthIndicator: true
+        limitForPeriod: 100
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+    instances:
+      api:
+        limitForPeriod: 1000
+        limitRefreshPeriod: 1s
+
+# Service Discovery (Kubernetes 환경)
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:false}
+    serviceUrl:
+      defaultZone: ${EUREKA_SERVER:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30

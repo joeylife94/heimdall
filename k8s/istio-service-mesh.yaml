@@ -1,0 +1,163 @@
+# Istio Service Mesh 설정 (선택적)
+# 고급 트래픽 관리, 보안, 관찰성 제공
+
+---
+# Gateway 정의
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: bifrost-gateway
+  namespace: production
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "api.bifrost-ecosystem.com"
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - "api.bifrost-ecosystem.com"
+    tls:
+      mode: SIMPLE
+      credentialName: bifrost-tls-cert
+
+---
+# Virtual Service - Heimdall
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: heimdall-routes
+  namespace: production
+spec:
+  hosts:
+  - "api.bifrost-ecosystem.com"
+  gateways:
+  - bifrost-gateway
+  http:
+  # 로그 수집 (높은 우선순위)
+  - match:
+    - uri:
+        prefix: "/heimdall/api/v1/logs"
+    route:
+    - destination:
+        host: heimdall-service
+        port:
+          number: 8080
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: 5xx,reset,connect-failure,refused-stream
+  
+  # 검색 API
+  - match:
+    - uri:
+        prefix: "/heimdall/api/v1/search"
+    route:
+    - destination:
+        host: heimdall-service
+        port:
+          number: 8080
+    timeout: 10s
+  
+  # 통계 API
+  - match:
+    - uri:
+        prefix: "/heimdall/api/v1/statistics"
+    route:
+    - destination:
+        host: heimdall-service
+        port:
+          number: 8080
+    timeout: 10s
+
+---
+# Destination Rule - Traffic Policy
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: heimdall-destination
+  namespace: production
+spec:
+  host: heimdall-service
+  trafficPolicy:
+    # Connection Pool 설정
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 2
+    # Load Balancer 설정
+    loadBalancer:
+      simple: LEAST_REQUEST
+    # Outlier Detection (Circuit Breaker)
+    outlierDetection:
+      consecutiveErrors: 5
+      interval: 30s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+
+---
+# Service Entry - External Services
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: elasticsearch-external
+  namespace: production
+spec:
+  hosts:
+  - elasticsearch.default.svc.cluster.local
+  ports:
+  - number: 9200
+    name: http
+    protocol: HTTP
+  location: MESH_INTERNAL
+  resolution: DNS
+
+---
+# Authorization Policy - Security
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: heimdall-authz
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app: heimdall
+  action: ALLOW
+  rules:
+  # Health check는 인증 불필요
+  - to:
+    - operation:
+        paths: ["/actuator/health"]
+  # API는 JWT 필요
+  - from:
+    - source:
+        requestPrincipals: ["*"]
+    to:
+    - operation:
+        paths: ["/api/*"]
+
+---
+# Peer Authentication - mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: production
+spec:
+  mtls:
+    mode: STRICT

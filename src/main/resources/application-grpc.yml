@@ -1,0 +1,29 @@
+# gRPC 설정
+grpc:
+  server:
+    # gRPC 서버 포트
+    port: ${GRPC_PORT:9090}
+    
+    # 최대 메시지 크기 (10MB)
+    max-inbound-message-size: 10485760
+    
+    # Keep-alive 설정
+    keep-alive-time: 30s
+    keep-alive-timeout: 10s
+    permit-keep-alive-without-calls: true
+    
+    # 보안 설정 (선택적)
+    security:
+      enabled: ${GRPC_SECURITY_ENABLED:false}
+      # TLS 인증서 경로
+      # certificate-chain: classpath:grpc-server-cert.pem
+      # private-key: classpath:grpc-server-key.pem
+    
+    # 헬스 체크
+    health:
+      enabled: true
+
+# Spring 설정과 통합
+spring:
+  application:
+    name: heimdall-grpc
