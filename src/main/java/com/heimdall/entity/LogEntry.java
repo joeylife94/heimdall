@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Type;
-import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
+import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
